@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 /**
  * @title QXC Token
- * @dev ERC20 Token implementation with minting and burning
+ * @dev Enhanced ERC20 Token with staking, governance, and advanced features
  */
 contract QXCToken {
     mapping(address => uint256) private _balances;
@@ -16,6 +16,17 @@ contract QXCToken {
     
     address public owner;
     mapping(address => bool) public minters;
+    
+    // Enhanced features
+    mapping(address => bool) public blacklisted;
+    mapping(address => uint256) public stakingBalance;
+    mapping(address => uint256) public stakingTimestamp;
+    mapping(address => uint256) public votingPower;
+    
+    uint256 public constant MAX_SUPPLY = 1_000_000_000 * 10**18; // 1 billion max
+    uint256 public stakingRewardRate = 500; // 5% APY
+    uint256 public minimumStakingAmount = 100 * 10**18; // 100 QXC minimum
+    bool public paused = false;
     
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Approval(address indexed owner, address indexed spender, uint256 value);

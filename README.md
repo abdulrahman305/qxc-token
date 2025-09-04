@@ -1,6 +1,6 @@
-# QXC Token Contract
+# QXC Token - QENEX Ecosystem Token
 
-ERC20-compatible token with minting and burning capabilities.
+Enterprise-grade ERC20 token with staking, governance, and advanced DeFi features for the QENEX banking ecosystem.
 
 ## 📋 Contract Features
 
