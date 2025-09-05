@@ -1,6 +1,6 @@
-# QXC Token - QENEX Ecosystem Token
+# Token System
 
-Enterprise-grade ERC20 token with staking, governance, and advanced DeFi features for the QENEX banking ecosystem.
+Advanced token implementation with integrated financial operating system.
 
 ## 📋 Contract Features
 
