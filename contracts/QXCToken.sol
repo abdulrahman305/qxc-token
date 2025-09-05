@@ -1,46 +1,98 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+
 /**
- * @title QXC Token
- * @dev Enhanced ERC20 Token with staking, governance, and advanced features
+ * @title QXC Token V2
+ * @dev Production-grade ERC20 Token with advanced DeFi features
+ * @notice Implements staking, governance, fee mechanisms, and security controls
  */
-contract QXCToken {
+contract QXCToken is IERC20, IERC20Metadata, Ownable, Pausable, ReentrancyGuard {
     mapping(address => uint256) private _balances;
     mapping(address => mapping(address => uint256)) private _allowances;
+    mapping(address => bool) private _blacklist;
+    mapping(address => bool) private _whitelist;
+    mapping(address => uint256) private _stakingBalances;
+    mapping(address => uint256) private _stakingTimestamps;
+    mapping(address => uint256) private _votingPower;
+    mapping(address => uint256) private _lastClaimTime;
+    mapping(address => bool) public minters;
 
     uint256 private _totalSupply;
-    string public name;
-    string public symbol;
-    uint8 public decimals;
+    uint256 private constant _maxSupply = 1_000_000_000 * 10**8; // 1 billion with 8 decimals
+    string public override name = "QENEX Token";
+    string public override symbol = "QXC";
+    uint8 public override decimals = 8;
     
-    address public owner;
-    mapping(address => bool) public minters;
+    // Fee mechanism
+    uint256 public transactionFeePercent = 10; // 0.1% = 10 basis points
+    uint256 public constant FEE_DENOMINATOR = 10000;
+    address public feeRecipient;
+    uint256 public totalFeeCollected;
     
-    // Enhanced features
-    mapping(address => bool) public blacklisted;
-    mapping(address => uint256) public stakingBalance;
-    mapping(address => uint256) public stakingTimestamp;
-    mapping(address => uint256) public votingPower;
+    // Staking parameters
+    uint256 public stakingAPR = 500; // 5% APR = 500 basis points
+    uint256 public minStakingPeriod = 7 days;
+    uint256 public totalStaked;
     
-    uint256 public constant MAX_SUPPLY = 1_000_000_000 * 10**18; // 1 billion max
-    uint256 public stakingRewardRate = 500; // 5% APY
-    uint256 public minimumStakingAmount = 100 * 10**18; // 100 QXC minimum
-    bool public paused = false;
+    // Security features
+    bool public whitelistEnabled = false;
+    bool public blacklistEnabled = true;
+    bool public stakingEnabled = true;
+    bool public votingEnabled = true;
     
-    event Transfer(address indexed from, address indexed to, uint256 value);
-    event Approval(address indexed owner, address indexed spender, uint256 value);
-    event MinterAdded(address indexed minter);
-    event MinterRemoved(address indexed minter);
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    // Circuit breaker
+    uint256 public maxTransferAmount = _maxSupply / 100; // 1% of max supply
+    uint256 public dailyTransferLimit = _maxSupply / 10; // 10% of max supply
+    mapping(address => uint256) private _dailyTransferred;
+    mapping(address => uint256) private _lastTransferDate;
     
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Not owner");
+    event Burn(address indexed burner, uint256 value);
+    event Mint(address indexed to, uint256 value);
+    event Stake(address indexed staker, uint256 amount);
+    event Unstake(address indexed staker, uint256 amount, uint256 reward);
+    event RewardClaimed(address indexed staker, uint256 reward);
+    event BlacklistUpdated(address indexed account, bool isBlacklisted);
+    event WhitelistUpdated(address indexed account, bool isWhitelisted);
+    event FeeCollected(address indexed from, uint256 amount);
+    event EmergencyWithdraw(address indexed to, uint256 amount);
+    event CircuitBreakerActivated(address indexed account, string reason);
+    
+    modifier onlyMinter() {
+        require(minters[msg.sender] || msg.sender == owner(), "Not authorized minter");
         _;
     }
     
-    modifier onlyMinter() {
-        require(minters[msg.sender] || msg.sender == owner, "Not minter");
+    modifier notBlacklisted(address account) {
+        require(!_blacklist[account], "Account is blacklisted");
+        _;
+    }
+    
+    modifier checkWhitelist(address from, address to) {
+        if (whitelistEnabled) {
+            require(_whitelist[from] || _whitelist[to] || from == owner() || to == owner(), 
+                    "Transfer requires whitelisted address");
+        }
+        _;
+    }
+    
+    modifier checkTransferLimits(address sender, uint256 amount) {
+        require(amount <= maxTransferAmount, "Transfer exceeds maximum amount");
+        
+        uint256 today = block.timestamp / 1 days;
+        if (_lastTransferDate[sender] < today) {
+            _dailyTransferred[sender] = 0;
+            _lastTransferDate[sender] = today;
+        }
+        
+        require(_dailyTransferred[sender] + amount <= dailyTransferLimit, 
+                "Daily transfer limit exceeded");
+        _dailyTransferred[sender] += amount;
         _;
     }
     
