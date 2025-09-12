@@ -210,7 +210,7 @@ ws://api.qenex.ai/v1/token/events
 
 ## Support & Resources
 
-- Technical Docs: https://docs.qenex.ai/qxc-token
+- Technical Docs: https://abdulrahman305.github.io/qenex-docs
 - GitHub: https://github.com/abdulrahman305/qxc-token
 - Discord: https://discord.gg/qenex
-- Email: token@qenex.ai
+- Email: ceo@qenex.ai

@@ -161,6 +161,7 @@ contract QXCToken is Context, IERC20, IERC20Metadata, Ownable, Pausable {
         uint256 againstVotes;
         uint256 startTime;
         uint256 endTime;
+        uint256 executionTime; // SECURITY FIX: Add timelock
         bool executed;
         ProposalType proposalType;
         bytes callData;
@@ -407,6 +408,7 @@ contract QXCToken is Context, IERC20, IERC20Metadata, Ownable, Pausable {
             againstVotes: 0,
             startTime: block.timestamp,
             endTime: block.timestamp + 3 days,
+            executionTime: block.timestamp + 3 days + 2 days, // SECURITY FIX: 2 day timelock after voting ends
             executed: false,
             proposalType: proposalType,
             callData: callData
@@ -440,8 +442,10 @@ contract QXCToken is Context, IERC20, IERC20Metadata, Ownable, Pausable {
         Proposal storage proposal = proposals[proposalId];
         
         require(block.timestamp > proposal.endTime, "Voting not ended");
+        require(block.timestamp >= proposal.executionTime, "Timelock not expired"); // SECURITY FIX: Timelock check
         require(!proposal.executed, "Already executed");
         require(proposal.forVotes > proposal.againstVotes, "Proposal failed");
+        require(proposal.forVotes >= (totalSupply() * 10) / 100, "Insufficient quorum"); // SECURITY FIX: Minimum quorum
         
         proposal.executed = true;
         
@@ -538,6 +542,7 @@ contract QXCToken is Context, IERC20, IERC20Metadata, Ownable, Pausable {
         uint256 againstVotes,
         uint256 startTime,
         uint256 endTime,
+        uint256 executionTime, // SECURITY FIX: Include execution time in view
         bool executed
     ) {
         Proposal memory proposal = proposals[proposalId];
@@ -548,6 +553,7 @@ contract QXCToken is Context, IERC20, IERC20Metadata, Ownable, Pausable {
             proposal.againstVotes,
             proposal.startTime,
             proposal.endTime,
+            proposal.executionTime,
             proposal.executed
         );
     }
